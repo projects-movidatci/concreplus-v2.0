@@ -3,6 +3,7 @@ import { NAV_ITEM_TYPE_TITLE, NAV_ITEM_TYPE_ITEM } from '@/constants/navigation.
 import {
     ALL_APP_ROLES,
     SUPERVISOR_AND_ADMIN,
+    DESPACHO_ROLES,
 } from '@/constants/roles.constant'
 import type { NavigationTree } from '@/@types/navigation'
 
@@ -73,7 +74,7 @@ const mainNavigationConfig: NavigationTree[] = [
                 translateKey: 'nav.despacho',
                 icon: 'despacho',
                 type: NAV_ITEM_TYPE_ITEM,
-                authority: SUPERVISOR_AND_ADMIN,
+                authority: DESPACHO_ROLES,
                 subMenu: [],
             },
             {

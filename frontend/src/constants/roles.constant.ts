@@ -4,12 +4,16 @@ import { APP_PREFIX_PATH } from '@/constants/route.constant'
 export const VENDEDOR = 'vendedor'
 export const SUPERVISOR = 'supervisor'
 export const ADMIN = 'admin'
+export const DESPACHADOR = 'despachador'
 
 /** Pantallas que no son solo para vendedor (dashboard, programación, etc.). */
 export const SUPERVISOR_AND_ADMIN: string[] = [SUPERVISOR, ADMIN]
 
+/** Pantallas de despacho. */
+export const DESPACHO_ROLES: string[] = [SUPERVISOR, ADMIN, DESPACHADOR]
+
 /** Cualquier rol de la aplicación (sustituye al antiguo `user`). */
-export const ALL_APP_ROLES: string[] = [VENDEDOR, SUPERVISOR, ADMIN]
+export const ALL_APP_ROLES: string[] = [VENDEDOR, SUPERVISOR, ADMIN, DESPACHADOR]
 
 export function getDefaultRouteForAuthority(authority: string[]): string {
     if (authority.includes(ADMIN) || authority.includes(SUPERVISOR)) {
