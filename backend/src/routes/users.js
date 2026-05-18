@@ -2,10 +2,11 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const { z } = require("zod");
 const { pool } = require("../db/pool");
+const { supabaseAdmin } = require("../config/supabase");
 
 const router = express.Router();
 
-const ROLE_NAMES = ["vendedor", "supervisor", "admin"];
+const ROLE_NAMES = ["vendedor", "supervisor", "admin", "despachador"];
 
 function getTenantId(req, res) {
   const tenantId = Number(req.auth?.tenantId);
@@ -33,7 +34,6 @@ function canListUsers(req) {
   return isAdmin(req) || isSupervisor(req);
 }
 
-/** Usuario objetivo tiene rol de privilegio (supervisor o admin): el supervisor no puede tocarlos */
 function targetIsPrivileged(roles) {
   const list = Array.isArray(roles) ? roles : [];
   return list.includes("admin") || list.includes("supervisor");
@@ -43,7 +43,7 @@ const createUserSchema = z.object({
   email: z.string().trim().email("Email invalido"),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
   fullName: z.string().trim().min(1, "Nombre requerido"),
-  role: z.enum(["vendedor", "supervisor", "admin"]),
+  role: z.enum(["vendedor", "supervisor", "admin", "despachador"]),
 });
 
 const updateUserSchema = z
@@ -52,7 +52,7 @@ const updateUserSchema = z
     fullName: z.string().trim().min(1).optional(),
     password: z.string().min(6).optional().or(z.literal("")),
     isActive: z.boolean().optional(),
-    role: z.enum(["vendedor", "supervisor", "admin"]).optional(),
+    role: z.enum(["vendedor", "supervisor", "admin", "despachador"]).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "Debes enviar al menos un campo",
@@ -83,6 +83,13 @@ async function setUserSingleRole(tenantId, userId, roleName) {
   const roleId = roleRes.rows[0].id;
   await pool.query(`DELETE FROM user_roles WHERE user_id = $1`, [userId]);
   await pool.query(`INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)`, [userId, roleId]);
+}
+
+async function getSupaUserIdByEmail(email) {
+  const { data } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+  if (!data?.users) return null;
+  const u = data.users.find(user => user.email === email.toLowerCase());
+  return u ? u.id : null;
 }
 
 router.get("/", async (req, res, next) => {
@@ -168,6 +175,22 @@ router.post("/", async (req, res, next) => {
       return res.status(409).json({ ok: false, message: "Ya existe un usuario con ese email" });
     }
 
+    // CREAR EN SUPABASE AUTH
+    const { data: supaData, error: supaErr } = await supabaseAdmin.auth.admin.createUser({
+      email: payload.email.toLowerCase(),
+      password: payload.password,
+      email_confirm: true,
+      user_metadata: {
+        authority: [payload.role],
+        tenantId: tenantId,
+        full_name: payload.fullName
+      }
+    });
+
+    if (supaErr) {
+      return res.status(400).json({ ok: false, message: supaErr.message });
+    }
+
     const passwordHash = await bcrypt.hash(String(payload.password), 10);
 
     const ins = await pool.query(
@@ -224,6 +247,7 @@ router.patch("/:id", async (req, res, next) => {
     if (userRow.rows.length === 0) {
       return res.status(404).json({ ok: false, message: "Usuario no encontrado" });
     }
+    const currentEmail = userRow.rows[0].email;
 
     const currentRoles = await getUserRoles(id);
     const privileged = targetIsPrivileged(currentRoles);
@@ -241,6 +265,16 @@ router.patch("/:id", async (req, res, next) => {
           message: "Solo un administrador puede asignar rol supervisor o administrador",
         });
       }
+    }
+
+    // UPDATE EN SUPABASE AUTH
+    const supaUid = await getSupaUserIdByEmail(currentEmail);
+    if (supaUid) {
+      const supaUpdates = {};
+      if (payload.email !== undefined) supaUpdates.email = payload.email.toLowerCase();
+      if (payload.password !== undefined && payload.password !== "") supaUpdates.password = payload.password;
+      if (payload.role !== undefined) supaUpdates.user_metadata = { authority: [payload.role], tenantId };
+      await supabaseAdmin.auth.admin.updateUserById(supaUid, supaUpdates);
     }
 
     const updates = [];
@@ -310,12 +344,13 @@ router.delete("/:id", async (req, res, next) => {
 
   try {
     const userRow = await pool.query(
-      `SELECT id FROM users WHERE tenant_id = $1 AND id = $2`,
+      `SELECT id, email FROM users WHERE tenant_id = $1 AND id = $2`,
       [tenantId, id]
     );
     if (userRow.rows.length === 0) {
       return res.status(404).json({ ok: false, message: "Usuario no encontrado" });
     }
+    const currentEmail = userRow.rows[0].email;
 
     const currentRoles = await getUserRoles(id);
     if (isSupervisor(req) && !isAdmin(req)) {
@@ -325,6 +360,12 @@ router.delete("/:id", async (req, res, next) => {
           message: "No puedes eliminar administradores ni supervisores",
         });
       }
+    }
+
+    // ELIMINAR EN SUPABASE AUTH
+    const supaUid = await getSupaUserIdByEmail(currentEmail);
+    if (supaUid) {
+      await supabaseAdmin.auth.admin.deleteUser(supaUid);
     }
 
     await pool.query(

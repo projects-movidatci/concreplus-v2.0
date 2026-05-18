@@ -30,6 +30,7 @@ function roleLabel(role: string) {
     if (role === 'admin') return 'Administrador'
     if (role === 'supervisor') return 'Supervisor'
     if (role === 'vendedor') return 'Vendedor'
+    if (role === 'despachador') return 'Despachador'
     return role
 }
 
@@ -40,6 +41,9 @@ function roleBadgeClass(role: string) {
     if (role === 'supervisor') {
         return 'bg-sky-100 text-sky-900 border-sky-200'
     }
+    if (role === 'despachador') {
+        return 'bg-indigo-100 text-indigo-900 border-indigo-200'
+    }
     return 'bg-gray-100 text-gray-800 border-gray-200'
 }
 
@@ -47,6 +51,7 @@ function primaryRole(roles: string[]) {
     if (roles.includes('admin')) return 'admin'
     if (roles.includes('supervisor')) return 'supervisor'
     if (roles.includes('vendedor')) return 'vendedor'
+    if (roles.includes('despachador')) return 'despachador'
     return roles[0] ?? ''
 }
 
@@ -251,8 +256,8 @@ const Usuarios = () => {
                     </h1>
                     <p className="text-gray-500 mt-1 text-sm md:text-base max-w-2xl">
                         Crea usuarios y asigna rol:{' '}
-                        <strong>Vendedor</strong>, <strong>Supervisor</strong> o{' '}
-                        <strong>Administrador</strong>.
+                        <strong>Vendedor</strong>, <strong>Supervisor</strong>,{' '}
+                        <strong>Despachador</strong> o <strong>Administrador</strong>.
                     </p>
                 </div>
                 <Button

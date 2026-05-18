@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const env = require("../config/env");
-const supabase = require("../config/supabase");
+const { supabase } = require("../config/supabase");
 
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization || "";
