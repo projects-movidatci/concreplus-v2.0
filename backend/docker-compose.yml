@@ -1,0 +1,27 @@
+# API en contenedor. Coloca un .env en esta misma carpeta (no se copia dentro de la imagen).
+#
+# IMPORTANTE: si la contraseña de PostgreSQL contiene "#", la línea DATABASE_URL debe ir
+# entre comillas dobles en el .env (ver .env.example). Si no, el "#" corta la URL.
+name: concreplus
+
+services:
+  api:
+    build: .
+    container_name: concreplus-api
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env:ro
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    # Compose lee el .env del directorio del proyecto para ${...}; así el contenedor siempre recibe estas claves.
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      DATABASE_URL: ${DATABASE_URL}
+      DB_SSL: ${DB_SSL:-true}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CPLUS_BACKEND_CONTEXT: ${CPLUS_BACKEND_CONTEXT:-}
+      CPLUS_BACKEND_DIR: ${CPLUS_BACKEND_DIR:-}
+    restart: unless-stopped
