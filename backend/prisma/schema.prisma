@@ -1,0 +1,349 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  roles             Role[]
+  users             User[]
+  clients           Client[]
+  works             Work[]
+  quotations        Quotation[]
+  orders            Order[]
+  orderEvents       OrderEvent[]
+  mixers            Mixer[]
+  drivers           Driver[]
+  invoices          Invoice[]
+  payments          Payment[]
+  notifications     Notification[]
+  userNotifications UserNotification[]
+
+  @@map("tenants")
+}
+
+model Role {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @map("tenant_id")
+  name      String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model Permission {
+  id          BigInt   @id @default(autoincrement())
+  code        String   @unique @db.VarChar(100)
+  moduleName  String   @map("module_name") @db.VarChar(50)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       BigInt @map("role_id")
+  permissionId BigInt @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id           BigInt   @id @default(autoincrement())
+  tenantId     BigInt   @map("tenant_id")
+  email        String   @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  fullName     String?  @map("full_name") @db.VarChar(255)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles         UserRole[]
+  notifications UserNotification[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model UserRole {
+  userId BigInt @map("user_id")
+  roleId BigInt @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model Client {
+  id             BigInt   @id @default(autoincrement())
+  tenantId       BigInt   @map("tenant_id")
+  name           String   @db.VarChar(255)
+  contactName    String?  @map("contact_name") @db.VarChar(255)
+  phone          String?  @db.VarChar(50)
+  email          String?  @db.VarChar(255)
+  creditType     String   @default("cash") @map("credit_type") @db.VarChar(50)
+  balancePending Decimal  @default(0) @map("balance_pending") @db.Decimal(14, 2)
+  status         String   @default("active") @db.VarChar(50)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  works      Work[]
+  quotations Quotation[]
+  orders     Order[]
+  invoices   Invoice[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, name])
+  @@map("clients")
+}
+
+model Work {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @map("tenant_id")
+  clientId  BigInt   @map("client_id")
+  name      String   @db.VarChar(255)
+  address   String?  @db.Text
+  status    String   @default("active") @db.VarChar(50)
+  progress  Int      @default(0) @db.SmallInt
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client     Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quotations Quotation[]
+  orders     Order[]
+
+  @@index([tenantId])
+  @@index([tenantId, clientId])
+  @@index([tenantId, status])
+  @@map("works")
+}
+
+model Quotation {
+  id           BigInt    @id @default(autoincrement())
+  tenantId     BigInt    @map("tenant_id")
+  clientId     BigInt    @map("client_id")
+  workId       BigInt    @map("work_id")
+  code         String    @db.VarChar(50)
+  concreteType String    @map("concrete_type") @db.VarChar(255)
+  cubicMeters  Decimal   @map("cubic_meters") @db.Decimal(10, 2)
+  pricePerM3   Decimal   @map("price_per_m3") @db.Decimal(12, 2)
+  totalAmount  Decimal   @map("total_amount") @db.Decimal(14, 2)
+  currency     String    @default("MXN") @db.VarChar(10)
+  status       String    @default("draft") @db.VarChar(50)
+  validUntil   DateTime? @map("valid_until") @db.Date
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client Client  @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  work   Work    @relation(fields: [workId], references: [id], onDelete: Restrict)
+  orders Order[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, clientId])
+  @@index([tenantId, workId])
+  @@index([tenantId, status])
+  @@map("quotations")
+}
+
+model Order {
+  id            BigInt    @id @default(autoincrement())
+  tenantId      BigInt    @map("tenant_id")
+  clientId      BigInt    @map("client_id")
+  workId        BigInt    @map("work_id")
+  quotationId   BigInt?   @map("quotation_id")
+  code          String    @db.VarChar(50)
+  concreteType  String    @map("concrete_type") @db.VarChar(255)
+  cubicMeters   Decimal   @map("cubic_meters") @db.Decimal(10, 2)
+  totalAmount   Decimal   @map("total_amount") @db.Decimal(14, 2)
+  deliveryAt    DateTime  @map("delivery_at") @db.Timestamptz()
+  status        String    @default("pending") @db.VarChar(50)
+  isScheduled   Boolean   @default(false) @map("is_scheduled")
+  mixerId       BigInt?   @map("mixer_id")
+  driverId      BigInt?   @map("driver_id")
+  dispatchedAt  DateTime? @map("dispatched_at") @db.Timestamptz()
+  deliveredAt   DateTime? @map("delivered_at") @db.Timestamptz()
+  deliveryNotes String?   @map("delivery_notes") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client    Client       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  work      Work         @relation(fields: [workId], references: [id], onDelete: Restrict)
+  quotation Quotation?   @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  events    OrderEvent[]
+  invoices  Invoice[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, clientId])
+  @@index([tenantId, workId])
+  @@index([tenantId, status])
+  @@map("orders")
+}
+
+model OrderEvent {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    BigInt   @map("tenant_id")
+  orderId     BigInt   @map("order_id")
+  eventType   String   @map("event_type") @db.VarChar(50)
+  eventLabel  String   @map("event_label") @db.VarChar(255)
+  eventStatus String   @map("event_status") @db.VarChar(50)
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz()
+  notes       String?  @db.Text
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, eventType])
+  @@map("order_events")
+}
+
+model Mixer {
+  id         BigInt   @id @default(autoincrement())
+  tenantId   BigInt   @map("tenant_id")
+  code       String   @db.VarChar(50)
+  plates     String?  @db.VarChar(50)
+  capacityM3 Decimal? @map("capacity_m3") @db.Decimal(10, 2)
+  status     String   @default("available") @db.VarChar(50)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("mixers")
+}
+
+model Driver {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @map("tenant_id")
+  fullName  String   @map("full_name") @db.VarChar(255)
+  phone     String?  @db.VarChar(50)
+  license   String?  @db.VarChar(100)
+  status    String   @default("available") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("drivers")
+}
+
+model Invoice {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    BigInt   @map("tenant_id")
+  clientId    BigInt   @map("client_id")
+  orderId     BigInt   @map("order_id")
+  code        String   @db.VarChar(50)
+  amount      Decimal  @db.Decimal(14, 2)
+  currency    String   @default("MXN") @db.VarChar(10)
+  issueDate   DateTime @map("issue_date") @db.Date
+  dueDate     DateTime @map("due_date") @db.Date
+  status      String   @default("pending") @db.VarChar(50)
+  creditTerms String?  @map("credit_terms") @db.VarChar(50)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz()
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, clientId])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  BigInt   @map("tenant_id")
+  invoiceId BigInt   @map("invoice_id")
+  amount    Decimal  @db.Decimal(14, 2)
+  currency  String   @default("MXN") @db.VarChar(10)
+  paidAt    DateTime @default(now()) @map("paid_at") @db.Timestamptz()
+  method    String?  @db.VarChar(50)
+  reference String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+  @@map("payments")
+}
+
+model Notification {
+  id         BigInt    @id @default(autoincrement())
+  tenantId   BigInt    @map("tenant_id")
+  code       String?   @db.VarChar(100)
+  title      String    @db.VarChar(255)
+  message    String    @db.Text
+  severity   String    @default("info") @db.VarChar(50)
+  targetType String    @default("user") @map("target_type") @db.VarChar(50)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz()
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRelations UserNotification[]
+
+  @@index([tenantId])
+  @@index([tenantId, severity])
+  @@map("notifications")
+}
+
+model UserNotification {
+  id             BigInt    @id @default(autoincrement())
+  tenantId       BigInt    @map("tenant_id")
+  userId         BigInt    @map("user_id")
+  notificationId BigInt    @map("notification_id")
+  isRead         Boolean   @default(false) @map("is_read")
+  readAt         DateTime? @map("read_at") @db.Timestamptz()
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, isRead])
+  @@index([notificationId])
+  @@map("user_notifications")
+}

@@ -10,6 +10,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(8),
   JWT_EXPIRES_IN: z.string().default("8h"),
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_ANON_KEY: z.string().min(20),
   DB_SSL: z
     .string()
     .optional()

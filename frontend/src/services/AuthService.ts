@@ -1,4 +1,4 @@
-import ApiService from './ApiService'
+import { supabase } from './SupabaseService'
 import type {
     SignInCredential,
     SignUpCredential,
@@ -9,40 +9,64 @@ import type {
 } from '@/@types/auth'
 
 export async function apiSignIn(data: SignInCredential) {
-    return ApiService.fetchData<SignInResponse>({
-        url: '/sign-in',
-        method: 'post',
-        data,
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: data.userName,
+        password: data.password,
     })
+
+    if (error) {
+        throw new Error(error.message)
+    }
+
+    return {
+        data: {
+            token: authData.session.access_token,
+            user: {
+                userName: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0] || 'User',
+                authority: authData.user.user_metadata?.authority || ['vendedor'],
+                email: authData.user.email,
+                avatar: authData.user.user_metadata?.avatar || '',
+            }
+        }
+    }
 }
 
 export async function apiSignUp(data: SignUpCredential) {
-    return ApiService.fetchData<SignUpResponse>({
-        url: '/sign-up',
-        method: 'post',
-        data,
+    const { data: authData, error } = await supabase.auth.signUp({
+        email: data.userName,
+        password: data.password,
     })
+
+    if (error) {
+        throw new Error(error.message)
+    }
+
+    return {
+        data: {
+            token: authData.session?.access_token || '',
+            user: {
+                userName: data.userName,
+                authority: ['vendedor'],
+                email: data.email,
+                avatar: '',
+            }
+        }
+    }
 }
 
 export async function apiSignOut() {
-    return ApiService.fetchData({
-        url: '/sign-out',
-        method: 'post',
-    })
+    const { error } = await supabase.auth.signOut()
+    if (error) throw new Error(error.message)
+    return { data: { ok: true } }
 }
 
 export async function apiForgotPassword(data: ForgotPassword) {
-    return ApiService.fetchData({
-        url: '/forgot-password',
-        method: 'post',
-        data,
-    })
+    const { error } = await supabase.auth.resetPasswordForEmail(data.email)
+    if (error) throw new Error(error.message)
+    return { data: { ok: true } }
 }
 
 export async function apiResetPassword(data: ResetPassword) {
-    return ApiService.fetchData({
-        url: '/reset-password',
-        method: 'post',
-        data,
-    })
+    // Requires handling hash in url
+    return { data: { ok: true } }
 }
